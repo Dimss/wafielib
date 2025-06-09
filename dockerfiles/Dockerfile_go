@@ -1,0 +1,25 @@
+FROM ubuntu:24.04
+ENV GO_VERSION="https://go.dev/dl/go1.24.4.linux-arm64.tar.gz"
+ENV PATH="/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV GOBIN="/go/bin"
+WORKDIR /go/src
+RUN apt -y update \
+    && apt -y install \
+      libxml2-dev \
+      libyajl-dev \
+      libgeoip-dev \
+      libcurl4-openssl-dev \
+      gcc \
+      vim \
+      wget
+RUN wget $GO_VERSION \
+    && tar -C /usr/local -xzf go1.24.4.linux-arm64.tar.gz \
+    && rm go1.24.4.linux-arm64.tar.gz \
+    && mkdir -p /go/bin \
+    && go install github.com/go-delve/delve/cmd/dlv@latest
+COPY example.conf /example.conf
+COPY libkubeguard.so /usr/local/lib/libkubeguard.so
+RUN mkdir /usr/local/include/kubeguardlib \
+     && ldconfig
+COPY kubeguardlib.h /usr/local/include/kubeguardlib/kubeguardlib.h
