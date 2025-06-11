@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM envoyproxy/envoy:contrib-v1.34.1
 RUN apt -y update \
     && apt install -y \
     apt-utils \
@@ -41,8 +41,3 @@ RUN cd /ModSecurity \
     && ./configure \
     && make \
     && make install
-COPY example.conf example.conf
-RUN apt -y install golang
-COPY libkubeguard.so /usr/local/lib/libkubeguard.so
-RUN mkdir /usr/local/include/kubeguardlib
-COPY kubeguardlib.h /usr/local/include/kubeguardlib/kubeguardlib.h

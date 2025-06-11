@@ -1,8 +1,8 @@
-FROM ubuntu:24.04
+FROM envoyproxy/envoy:contrib-v1.34.1
 ENV GO_VERSION="https://go.dev/dl/go1.24.4.linux-arm64.tar.gz"
-ENV PATH="/go/bin:${PATH}"
-ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
+ENV PATH="${PATH}:${GOBIN}:/usr/local/go/bin"
+ENV GOPATH="/go"
 WORKDIR /go/src
 RUN apt -y update \
     && apt -y install \
@@ -19,7 +19,7 @@ RUN wget $GO_VERSION \
     && mkdir -p /go/bin \
     && go install github.com/go-delve/delve/cmd/dlv@latest
 COPY example.conf /example.conf
+COPY include/ /usr/local/include/
 COPY libkubeguard.so /usr/local/lib/libkubeguard.so
-RUN mkdir /usr/local/include/kubeguardlib \
-     && ldconfig
-COPY kubeguardlib.h /usr/local/include/kubeguardlib/kubeguardlib.h
+RUN ldconfig
+
