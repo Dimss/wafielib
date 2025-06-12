@@ -2,7 +2,9 @@
 #define KUBEGUARDLIB_LIBRARY_H
 #include <modsecurity/transaction.h>
 
-void dump_rules(char const *file_path);
+void library_init(char const *file_path);
+
+void dump_rules();
 
 void cleanup(const char *error, RulesSet *rules, ModSecurity *modsec);
 

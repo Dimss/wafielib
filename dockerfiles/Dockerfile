@@ -41,3 +41,4 @@ RUN cd /ModSecurity \
     && ./configure \
     && make \
     && make install
+COPY example.conf /example.conf
