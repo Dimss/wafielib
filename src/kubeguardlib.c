@@ -9,7 +9,7 @@
 ModSecurity *modsec;
 RulesSet *rules;
 
-void library_init(char const *file_path) {
+void kg_library_init(char const *file_path) {
     const char *error = NULL;
     modsec = msc_init();
     msc_set_connector_info(modsec, "KubeGuard v0.0.1-alpha");
@@ -18,12 +18,12 @@ void library_init(char const *file_path) {
     if (ret < 0) {
         fprintf(stderr, "Problems loading the rules --\n");
         fprintf(stderr, "%s\n", error);
-        cleanup(error, rules, modsec);
+        kg_cleanup(error, rules, modsec);
     }
     msc_rules_dump(rules);
 }
 
-void cleanup(const char *error, RulesSet *rules, ModSecurity *modsec) {
+void kg_cleanup(const char *error, RulesSet *rules, ModSecurity *modsec) {
     if (error != NULL) {
         msc_rules_error_cleanup(error);
     }
@@ -32,7 +32,7 @@ void cleanup(const char *error, RulesSet *rules, ModSecurity *modsec) {
     exit(1);
 }
 
-ModSecurityIntervention new_msc_intervention() {
+ModSecurityIntervention kg_new_intervention() {
     ModSecurityIntervention intervention;
     intervention.status = 200;
     intervention.url = NULL;
@@ -42,11 +42,8 @@ ModSecurityIntervention new_msc_intervention() {
     return intervention;
 }
 
-int evaluate(EvaluationRequest const *request) {
-    // create new transaction
-    Transaction *transaction = msc_new_transaction(modsec, rules, NULL);
-    msc_process_connection(transaction, request->client_ip, 0, "0.0.0.0", 0);
-    ModSecurityIntervention intervention = new_msc_intervention();
+int kg_process_intervention(Transaction *transaction) {
+    ModSecurityIntervention intervention = kg_new_intervention();
     if (msc_intervention(transaction, &intervention) == 0) {
         return 0;
     }
@@ -66,7 +63,50 @@ int evaluate(EvaluationRequest const *request) {
         fprintf(stdout, "Intervention, returning code: %d\n", intervention.status);
         return intervention.status;
     }
+    return 0;
+}
+
+int kg_evaluate(EvaluationRequest const *request) {
+    // create new transaction
+    Transaction *transaction = msc_new_transaction(modsec, rules, NULL);
+    int intervention_status = 0;
+    // process connection
+    msc_process_connection(transaction, request->client_ip, 0, "0.0.0.0", 0);
+    intervention_status = kg_process_intervention(transaction);
+    if (intervention_status != 0) {
+        msc_transaction_cleanup(transaction);
+        return intervention_status;
+    }
+    // process URI and request headers
+    msc_process_uri(transaction, request->uri, request->http_method, request->http_version);
+    intervention_status = kg_process_intervention(transaction);
+    if (intervention_status != 0) {
+        msc_transaction_cleanup(transaction);
+        return intervention_status;
+    }
+    for (size_t i = 0; i < request->headers_count; i++) {
+        fprintf(stdout, "Adding request header: %s: %s\n",
+                request->headers[i].key, request->headers[i].value);
+        msc_add_request_header(transaction, request->headers[i].key, request->headers[i].value);
+    }
+    msc_process_request_headers(transaction);
+    intervention_status = kg_process_intervention(transaction);
+    if (intervention_status != 0) {
+        msc_transaction_cleanup(transaction);
+        return intervention_status;
+    }
     // cleanup transaction
     msc_transaction_cleanup(transaction);
+    return 0;
+}
+
+int kg_add_rule(char const *rule) {
+    const char *error = NULL;
+    int const ret = msc_rules_add(rules, rule, &error);
+    if (ret < 0) {
+        fprintf(stderr, "problems adding the rule -- %s\n", rule);
+        fprintf(stderr, "%s\n", error);
+        return 1;
+    }
     return 0;
 }

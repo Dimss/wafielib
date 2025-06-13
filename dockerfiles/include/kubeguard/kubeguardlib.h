@@ -3,15 +3,27 @@
 #include <modsecurity/transaction.h>
 
 typedef struct {
+    const unsigned char *key;
+    const unsigned char *value;
+} EvaluationRequestHeader;
+
+typedef struct {
     char *client_ip;
+    char *uri;
+    char *http_method;
+    char *http_version;
+    size_t headers_count;
+    EvaluationRequestHeader *headers;
 } EvaluationRequest;
 
-void library_init(char const *file_path);
+void kg_library_init(char const *file_path);
 
-int evaluate(EvaluationRequest const *request);
+int kg_evaluate(EvaluationRequest const *request);
 
-void dump_rules();
+void kg_dump_rules();
 
-void cleanup(const char *error, RulesSet *rules, ModSecurity *modsec);
+void kg_cleanup(const char *error, RulesSet *rules, ModSecurity *modsec);
+
+int kg_add_rule(const char *rule);
 
 #endif //KUBEGUARDLIB_LIBRARY_H
