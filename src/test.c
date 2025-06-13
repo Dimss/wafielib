@@ -8,7 +8,8 @@ int main() {
     //     {.key = (const unsigned char *) "Host", .value = (const unsigned char *) "example.com"},
     //     {.key = (const unsigned char *) "User-Agent", .value = (const unsigned char *) "KubeGuard/1.0"}
     // };
-
+    const unsigned char *key1 = (const unsigned char *) "Host";
+    const unsigned char *key2 = (const unsigned char *) "User-Agent";
     EvaluationRequestHeader *headers1 = malloc(sizeof(EvaluationRequestHeader) * 2);
     // EvaluationRequestHeader *headers1;
     headers1[0].key = (const unsigned char *) "Host";

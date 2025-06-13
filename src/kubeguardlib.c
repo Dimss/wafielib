@@ -85,8 +85,6 @@ int kg_evaluate(EvaluationRequest const *request) {
         return intervention_status;
     }
     for (size_t i = 0; i < request->headers_count; i++) {
-        fprintf(stdout, "Adding request header: %s: %s\n",
-                request->headers[i].key, request->headers[i].value);
         msc_add_request_header(transaction, request->headers[i].key, request->headers[i].value);
     }
     msc_process_request_headers(transaction);
