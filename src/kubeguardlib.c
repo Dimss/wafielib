@@ -42,10 +42,10 @@ ModSecurityIntervention new_msc_intervention() {
     return intervention;
 }
 
-int evaluate() {
-    // const char *error = NULL;
+int evaluate(EvaluationRequest const *request) {
+    // create new transaction
     Transaction *transaction = msc_new_transaction(modsec, rules, NULL);
-    msc_process_connection(transaction, "192.168.1.1", 12345, "127.0.0.1", 80);
+    msc_process_connection(transaction, request->client_ip, 0, "0.0.0.0", 0);
     ModSecurityIntervention intervention = new_msc_intervention();
     if (msc_intervention(transaction, &intervention) == 0) {
         return 0;
@@ -62,10 +62,11 @@ int evaluate() {
         intervention.url = NULL;
         return intervention.status;
     }
-
     if (intervention.status != 200) {
         fprintf(stdout, "Intervention, returning code: %d\n", intervention.status);
         return intervention.status;
     }
+    // cleanup transaction
+    msc_transaction_cleanup(transaction);
     return 0;
 }

@@ -4,6 +4,9 @@
 int main() {
     const char *file_path = "/example.conf";
     library_init(file_path);
-    int const res = evaluate();
+    EvaluationRequest const request = {
+        .client_ip = "192.168.1.1"
+    };
+    int const res = evaluate(&request);
     fprintf(stdout, "evaluation result : %d\n", res);
 }

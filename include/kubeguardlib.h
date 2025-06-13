@@ -2,9 +2,13 @@
 #define KUBEGUARDLIB_LIBRARY_H
 #include <modsecurity/transaction.h>
 
+typedef struct {
+    char *client_ip;
+} EvaluationRequest;
+
 void library_init(char const *file_path);
 
-int evaluate();
+int evaluate(EvaluationRequest const *request);
 
 void dump_rules();
 
