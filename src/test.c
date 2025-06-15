@@ -18,18 +18,21 @@ int main() {
     headers1[1].value = (const unsigned char *) "KubeGuard/1.0";
 
 
-    EvaluationRequest const request = {
-        .client_ip = "192.168.1.3",
-        .uri = "/admin",
+    EvaluationRequest request = {
+        .client_ip = "192.168.1.2",
+        .uri = "/",
         .http_method = "GET",
         .http_version = "1.1",
         .headers_count = 2,
-        .headers = headers1
+        .headers = headers1,
+        // .body = NULL
+        .body = "<html><body>Test</body></html>",
     };
+    kg_init_request_transaction(&request);
     kg_add_rule(
         "SecRule REMOTE_ADDR \"@ipMatch 192.168.1.2\" \"id:182374049403,phase:0,deny,status:403,msg:\'Blocking connection from specific IP\'\"");
 
-    int const res = kg_evaluate(&request);
+    int const res = kg_process_request_headers(&request);
     free(headers1);
     fprintf(stdout, "evaluation result : %d\n", res);
 }

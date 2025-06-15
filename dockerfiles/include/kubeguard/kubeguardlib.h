@@ -12,6 +12,7 @@ typedef struct {
     char *uri;
     char *http_method;
     char *http_version;
+    const unsigned char *body;
     size_t headers_count;
     EvaluationRequestHeader *headers;
 } EvaluationRequest;

@@ -24,12 +24,14 @@ void kg_library_init(char const *file_path) {
 }
 
 void kg_cleanup(const char *error, RulesSet *rules, ModSecurity *modsec) {
+    int res = 0;
     if (error != NULL) {
         msc_rules_error_cleanup(error);
+        res = 1;
     }
     msc_rules_cleanup(rules);
     msc_cleanup(modsec);
-    exit(1);
+    exit(res);
 }
 
 ModSecurityIntervention kg_new_intervention() {
@@ -66,35 +68,52 @@ int kg_process_intervention(Transaction *transaction) {
     return 0;
 }
 
-int kg_evaluate(EvaluationRequest const *request) {
+void kg_init_request_transaction(EvaluationRequest *request) {
     // create new transaction
-    Transaction *transaction = msc_new_transaction(modsec, rules, NULL);
+    request->transaction = msc_new_transaction(modsec, rules, NULL);
+}
+
+void kg_clean_request_transaction(Transaction *transaction) {
+    msc_transaction_cleanup(transaction);
+}
+
+int kg_process_request_headers(EvaluationRequest const *request) {
     int intervention_status = 0;
     // process connection
-    msc_process_connection(transaction, request->client_ip, 0, "0.0.0.0", 0);
-    intervention_status = kg_process_intervention(transaction);
+    msc_process_connection(request->transaction, request->client_ip, 0, "0.0.0.0", 0);
+    intervention_status = kg_process_intervention(request->transaction);
     if (intervention_status != 0) {
-        msc_transaction_cleanup(transaction);
+        msc_transaction_cleanup(request->transaction);
         return intervention_status;
     }
     // process URI and request headers
-    msc_process_uri(transaction, request->uri, request->http_method, request->http_version);
-    intervention_status = kg_process_intervention(transaction);
+    msc_process_uri(request->transaction, request->uri, request->http_method, request->http_version);
+    intervention_status = kg_process_intervention(request->transaction);
     if (intervention_status != 0) {
-        msc_transaction_cleanup(transaction);
+        msc_transaction_cleanup(request->transaction);
         return intervention_status;
     }
     for (size_t i = 0; i < request->headers_count; i++) {
-        msc_add_request_header(transaction, request->headers[i].key, request->headers[i].value);
+        msc_add_request_header(request->transaction, request->headers[i].key, request->headers[i].value);
     }
-    msc_process_request_headers(transaction);
-    intervention_status = kg_process_intervention(transaction);
+    msc_process_request_headers(request->transaction);
+    intervention_status = kg_process_intervention(request->transaction);
     if (intervention_status != 0) {
-        msc_transaction_cleanup(transaction);
+        msc_transaction_cleanup(request->transaction);
         return intervention_status;
     }
-    // cleanup transaction
-    msc_transaction_cleanup(transaction);
+    // process request body
+    if (request->body != NULL) {
+        msc_append_request_body(request->transaction,
+                                (const unsigned char *) request->body,
+                                strlen((const char *) request->body));
+        msc_process_request_body(request->transaction);
+        intervention_status = kg_process_intervention(request->transaction);
+        if (intervention_status != 0) {
+            msc_transaction_cleanup(request->transaction);
+            return intervention_status;
+        }
+    }
     return 0;
 }
 

@@ -12,13 +12,17 @@ typedef struct {
     char *uri;
     char *http_method;
     char *http_version;
+    char *body;
     size_t headers_count;
     EvaluationRequestHeader *headers;
+    Transaction *transaction;
 } EvaluationRequest;
 
 void kg_library_init(char const *file_path);
 
-int kg_evaluate(EvaluationRequest const *request);
+int kg_process_request_headers(EvaluationRequest const *request);
+
+void kg_init_request_transaction(EvaluationRequest *request);
 
 void kg_dump_rules();
 
