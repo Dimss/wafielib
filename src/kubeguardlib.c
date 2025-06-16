@@ -1,6 +1,7 @@
 #include "kubeguardlib.h"
 
 #include <stdio.h>
+#include <dirent.h>
 #include "modsecurity/rules_set.h"
 #include "modsecurity/modsecurity.h"
 #include "modsecurity/transaction.h"
@@ -9,17 +10,40 @@
 ModSecurity *modsec;
 RulesSet *rules;
 
-void kg_library_init(char const *file_path) {
-    const char *error = NULL;
+
+void load_rules_files(const char *config_path) {
+    const char *rules_load_error = NULL;
+    const char *config_file_suffix = ".conf";
+    struct dirent *entry;
+    DIR *dp = opendir(config_path);
+    if (dp == NULL) {
+        perror("opendir");
+        return;
+    }
+    while ((entry = readdir(dp))) {
+        if (entry->d_type == DT_REG) {
+            char const *is_config_file = strstr(entry->d_name, config_file_suffix);
+            if (is_config_file == NULL) continue;
+            char rule_file[1024];
+            snprintf(rule_file, sizeof(rule_file), "%s/%s", config_path, entry->d_name);
+            int const ret = msc_rules_add_file(rules, rule_file, &rules_load_error);
+            if (ret < 0) {
+                fprintf(stderr, "Problems loading the rules --\n");
+                fprintf(stderr, "%s\n", rules_load_error);
+                kg_cleanup(rules_load_error, rules, modsec);
+            }
+            printf("loaded file: %s\n", (const char *) rule_file);
+        }
+    }
+    closedir(dp);
+}
+
+void kg_library_init(char const *config_path) {
+    // const char *error = NULL;
     modsec = msc_init();
     msc_set_connector_info(modsec, "KubeGuard v0.0.1-alpha");
     rules = msc_create_rules_set();
-    int const ret = msc_rules_add_file(rules, file_path, &error);
-    if (ret < 0) {
-        fprintf(stderr, "Problems loading the rules --\n");
-        fprintf(stderr, "%s\n", error);
-        kg_cleanup(error, rules, modsec);
-    }
+    load_rules_files(config_path);
     msc_rules_dump(rules);
 }
 
@@ -73,8 +97,27 @@ void kg_init_request_transaction(EvaluationRequest *request) {
     request->transaction = msc_new_transaction(modsec, rules, NULL);
 }
 
-void kg_clean_request_transaction(Transaction *transaction) {
-    msc_transaction_cleanup(transaction);
+void kg_transaction_cleanup(EvaluationRequest const *request) {
+    msc_transaction_cleanup(request->transaction);
+}
+
+int kg_process_request_body(EvaluationRequest const *request) {
+    int intervention_status = 0;
+    // process request body
+    if (request->body != NULL) {
+        // append request body
+        msc_append_request_body(request->transaction,
+                                (const unsigned char *) request->body,
+                                strlen(request->body));
+        // process request body
+        msc_process_request_body(request->transaction);
+        // check for intervention
+        intervention_status = kg_process_intervention(request->transaction);
+        if (intervention_status != 0) {
+            return intervention_status;
+        }
+    }
+    return intervention_status;
 }
 
 int kg_process_request_headers(EvaluationRequest const *request) {
@@ -83,14 +126,12 @@ int kg_process_request_headers(EvaluationRequest const *request) {
     msc_process_connection(request->transaction, request->client_ip, 0, "0.0.0.0", 0);
     intervention_status = kg_process_intervention(request->transaction);
     if (intervention_status != 0) {
-        msc_transaction_cleanup(request->transaction);
         return intervention_status;
     }
     // process URI and request headers
     msc_process_uri(request->transaction, request->uri, request->http_method, request->http_version);
     intervention_status = kg_process_intervention(request->transaction);
     if (intervention_status != 0) {
-        msc_transaction_cleanup(request->transaction);
         return intervention_status;
     }
     for (size_t i = 0; i < request->headers_count; i++) {
@@ -99,22 +140,9 @@ int kg_process_request_headers(EvaluationRequest const *request) {
     msc_process_request_headers(request->transaction);
     intervention_status = kg_process_intervention(request->transaction);
     if (intervention_status != 0) {
-        msc_transaction_cleanup(request->transaction);
         return intervention_status;
     }
-    // process request body
-    if (request->body != NULL) {
-        msc_append_request_body(request->transaction,
-                                (const unsigned char *) request->body,
-                                strlen((const char *) request->body));
-        msc_process_request_body(request->transaction);
-        intervention_status = kg_process_intervention(request->transaction);
-        if (intervention_status != 0) {
-            msc_transaction_cleanup(request->transaction);
-            return intervention_status;
-        }
-    }
-    return 0;
+    return intervention_status;
 }
 
 int kg_add_rule(char const *rule) {

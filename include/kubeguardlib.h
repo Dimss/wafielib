@@ -18,11 +18,15 @@ typedef struct {
     Transaction *transaction;
 } EvaluationRequest;
 
-void kg_library_init(char const *file_path);
+void kg_library_init(char const *config_path);
 
 int kg_process_request_headers(EvaluationRequest const *request);
 
+int kg_process_request_body(EvaluationRequest const *request);
+
 void kg_init_request_transaction(EvaluationRequest *request);
+
+void kg_transaction_cleanup(EvaluationRequest const *request);
 
 void kg_dump_rules();
 

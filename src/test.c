@@ -2,16 +2,9 @@
 #include <kubeguardlib.h>
 
 int main() {
-    const char *file_path = "/example.conf";
-    kg_library_init(file_path);
-    // EvaluationRequestHeader headers[] = {
-    //     {.key = (const unsigned char *) "Host", .value = (const unsigned char *) "example.com"},
-    //     {.key = (const unsigned char *) "User-Agent", .value = (const unsigned char *) "KubeGuard/1.0"}
-    // };
-    const unsigned char *key1 = (const unsigned char *) "Host";
-    const unsigned char *key2 = (const unsigned char *) "User-Agent";
+    char const *config_path = "/config";
+    kg_library_init(config_path);
     EvaluationRequestHeader *headers1 = malloc(sizeof(EvaluationRequestHeader) * 2);
-    // EvaluationRequestHeader *headers1;
     headers1[0].key = (const unsigned char *) "Host";
     headers1[0].value = (const unsigned char *) "example.com";
     headers1[1].key = (const unsigned char *) "User-Agent";
@@ -19,7 +12,7 @@ int main() {
 
 
     EvaluationRequest request = {
-        .client_ip = "192.168.1.2",
+        .client_ip = "192.168.1.3",
         .uri = "/",
         .http_method = "GET",
         .http_version = "1.1",
@@ -32,7 +25,8 @@ int main() {
     kg_add_rule(
         "SecRule REMOTE_ADDR \"@ipMatch 192.168.1.2\" \"id:182374049403,phase:0,deny,status:403,msg:\'Blocking connection from specific IP\'\"");
 
-    int const res = kg_process_request_headers(&request);
+    fprintf(stdout, "headers evaluation result : %d\n", kg_process_request_headers(&request));
+    fprintf(stdout, "body evaluation result : %d\n", kg_process_request_body(&request));
     free(headers1);
-    fprintf(stdout, "evaluation result : %d\n", res);
+    kg_transaction_cleanup((EvaluationRequest * const) request.transaction);
 }

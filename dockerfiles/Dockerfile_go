@@ -18,7 +18,7 @@ RUN wget $GO_VERSION \
     && rm go1.24.4.linux-arm64.tar.gz \
     && mkdir -p /go/bin \
     && go install github.com/go-delve/delve/cmd/dlv@latest
-COPY example.conf /example.conf
+COPY /config/ /config/
 COPY include/ /usr/local/include/
 COPY libkubeguard.so /usr/local/lib/libkubeguard.so
 RUN ldconfig
