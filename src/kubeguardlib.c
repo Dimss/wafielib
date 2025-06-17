@@ -10,40 +10,68 @@
 ModSecurity *modsec;
 RulesSet *rules;
 
+static void kg_load_main_configs(char const *config_path) {
+    char **main_config_files = (char *[]){
+        "modsecurity.conf",
+        "crs-setup.conf",
+    };
+    const char *cfg_add_error = NULL;
+    for (size_t i = 0; i < 2; i++) {
+        char conf_file[strlen(main_config_files[i]) + strlen(config_path) + 2];
+        snprintf(conf_file, sizeof(conf_file), "%s/%s", config_path, main_config_files[i]);
+        fprintf(stdout, "loading rule file: %s\n", conf_file);
+        int const ret = msc_rules_add_file(rules, conf_file, &cfg_add_error);
+        if (ret < 0) {
+            fprintf(stderr, "problems loading the rules --\n");
+            fprintf(stderr, "%s\n", cfg_add_error);
+            kg_cleanup(cfg_add_error, rules, modsec);
+        }
+    }
+}
 
-void load_rules_files(const char *config_path) {
+static void kg_load_modescurity_rules_configs(char const *config_path) {
     const char *rules_load_error = NULL;
     const char *config_file_suffix = ".conf";
+    // 7 = strlen("/rules") + 1
+    char rules_path[strlen(config_path) + 7];
+    snprintf(rules_path, sizeof(rules_path), "%s/rules", config_path);
     struct dirent *entry;
-    DIR *dp = opendir(config_path);
+    DIR *dp = opendir(rules_path);
     if (dp == NULL) {
         perror("opendir");
         return;
     }
+    // load the rules files
     while ((entry = readdir(dp))) {
         if (entry->d_type == DT_REG) {
             char const *is_config_file = strstr(entry->d_name, config_file_suffix);
             if (is_config_file == NULL) continue;
-            char rule_file[1024];
-            snprintf(rule_file, sizeof(rule_file), "%s/%s", config_path, entry->d_name);
+            char rule_file[strlen(rules_path) + strlen(entry->d_name) + 2];
+            snprintf(rule_file, sizeof(rule_file), "%s/%s", rules_path, entry->d_name);
             int const ret = msc_rules_add_file(rules, rule_file, &rules_load_error);
             if (ret < 0) {
-                fprintf(stderr, "Problems loading the rules --\n");
+                fprintf(stderr, "problems loading the rules --\n");
                 fprintf(stderr, "%s\n", rules_load_error);
                 kg_cleanup(rules_load_error, rules, modsec);
             }
-            printf("loaded file: %s\n", (const char *) rule_file);
+            printf("loading rule file: %s\n", (const char *) rule_file);
         }
     }
     closedir(dp);
 }
 
+static void kg_load_modsecuirty_configuration(char const *config_path) {
+    // load main configurations files
+    kg_load_main_configs(config_path);
+    // load the rules files
+    kg_load_modescurity_rules_configs(config_path);
+}
+
 void kg_library_init(char const *config_path) {
-    // const char *error = NULL;
     modsec = msc_init();
     msc_set_connector_info(modsec, "KubeGuard v0.0.1-alpha");
     rules = msc_create_rules_set();
-    load_rules_files(config_path);
+    kg_load_modsecuirty_configuration(config_path);
     msc_rules_dump(rules);
 }
 

@@ -30,8 +30,8 @@ void kg_transaction_cleanup(EvaluationRequest const *request);
 
 void kg_dump_rules();
 
-void kg_cleanup(const char *error, RulesSet *rules, ModSecurity *modsec);
+void kg_cleanup(char const *error, RulesSet *rules, ModSecurity *modsec);
 
-int kg_add_rule(const char *rule);
+int kg_add_rule(char const *rule);
 
 #endif //KUBEGUARDLIB_LIBRARY_H
