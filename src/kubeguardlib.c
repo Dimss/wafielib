@@ -10,7 +10,7 @@
 ModSecurity *modsec;
 RulesSet *rules;
 
-static void kg_load_main_configs(char const *config_path) {
+static void kg_load_main_configs(char const *config_path, int *total_loaded_rules) {
     char **main_config_files = (char *[]){
         "modsecurity.conf",
         "crs-setup.conf",
@@ -19,17 +19,23 @@ static void kg_load_main_configs(char const *config_path) {
     for (size_t i = 0; i < 2; i++) {
         char conf_file[strlen(main_config_files[i]) + strlen(config_path) + 2];
         snprintf(conf_file, sizeof(conf_file), "%s/%s", config_path, main_config_files[i]);
-        fprintf(stdout, "loading rule file: %s\n", conf_file);
+        // fprintf(stdout, "loading rule file: %s\n", conf_file);
         int const ret = msc_rules_add_file(rules, conf_file, &cfg_add_error);
         if (ret < 0) {
             fprintf(stderr, "problems loading the rules --\n");
             fprintf(stderr, "%s\n", cfg_add_error);
             kg_cleanup(cfg_add_error, rules, modsec);
         }
+        *total_loaded_rules += ret;
     }
+    // kg_add_rule("SecAction \"id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.12.0\',setvar:tx.blocking_paranoia_level=1\"");
+    //     kg_add_rule("SecAction \"id:203948180384,phase:1,log,pass,msg:'FOO-PARANOIA-LEVEL: %{tx.blocking_paranoia_level}'\"");
+    //     kg_add_rule("SecAction \"id:900110,phase:1,nolog,pass,t:none,setvar:tx.anomaly_score_blocking=off\"");
+    //     kg_add_rule("SecAction \"id:900120,phase:1,nolog,pass,t:none,setvar:tx.inbound_anomaly_score_threshold=0\"");
+    //     kg_add_rule("SecAction \"id:900130,phase:1,nolog,pass,t:none,setvar:tx.outbound_anomaly_score_threshold=0\"");
 }
 
-static void kg_load_modescurity_rules_configs(char const *config_path) {
+static void kg_load_modescurity_rules_configs(char const *config_path, int *total_loaded_rules) {
     const char *rules_load_error = NULL;
     const char *config_file_suffix = ".conf";
     // 7 = strlen("/rules") + 1
@@ -54,25 +60,36 @@ static void kg_load_modescurity_rules_configs(char const *config_path) {
                 fprintf(stderr, "%s\n", rules_load_error);
                 kg_cleanup(rules_load_error, rules, modsec);
             }
-            printf("loading rule file: %s\n", (const char *) rule_file);
+            // printf("loading rule file: %s\n", (const char *) rule_file);
+            *total_loaded_rules += ret;
         }
     }
     closedir(dp);
 }
 
 static void kg_load_modsecuirty_configuration(char const *config_path) {
+    int total_loaded_rules = 0;
     // load main configurations files
-    kg_load_main_configs(config_path);
+    kg_load_main_configs(config_path, &total_loaded_rules);
     // load the rules files
-    kg_load_modescurity_rules_configs(config_path);
+    kg_load_modescurity_rules_configs(config_path, &total_loaded_rules);
+    // print the total loaded rules
+    fprintf(stdout, "total rules loaded: %d\n", total_loaded_rules);
+}
+
+void kg_log_cb(void *data, const void *msg) {
+    fprintf(stderr, "%s\n", (const char *) msg);
 }
 
 void kg_library_init(char const *config_path) {
     modsec = msc_init();
+    msc_set_log_cb(modsec, kg_log_cb);
     msc_set_connector_info(modsec, "KubeGuard v0.0.1-alpha");
+
     rules = msc_create_rules_set();
     kg_load_modsecuirty_configuration(config_path);
-    msc_rules_dump(rules);
+
+    // msc_rules_dump(rules);
 }
 
 void kg_cleanup(const char *error, RulesSet *rules, ModSecurity *modsec) {
@@ -116,6 +133,9 @@ int kg_process_intervention(Transaction *transaction) {
     if (intervention.status != 200) {
         fprintf(stdout, "Intervention, returning code: %d\n", intervention.status);
         return intervention.status;
+    }
+    if (intervention.disruptive != 0) {
+        return intervention.disruptive;
     }
     return 0;
 }
