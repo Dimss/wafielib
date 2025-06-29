@@ -74,7 +74,7 @@ static void kg_load_modsecuirty_configuration(char const *config_path) {
     // load the rules files
     kg_load_modescurity_rules_configs(config_path, &total_loaded_rules);
     // print the total loaded rules
-    fprintf(stdout, "total rules loaded: %d\n", total_loaded_rules);
+    fprintf(stdout, "[kubeguardlib] total rules loaded: %d\n", total_loaded_rules);
 }
 
 void kg_log_cb(void *data, const void *msg) {
@@ -118,11 +118,10 @@ int kg_process_intervention(Transaction *transaction) {
     if (msc_intervention(transaction, &intervention) == 0) {
         return 0;
     }
-    if (intervention.log == NULL) {
-        intervention.log = strdup("(no log message was specified)");
+    if (intervention.log != NULL) {
+        fprintf(stdout, "%s\n", intervention.log);
+        free(intervention.log);
     }
-    fprintf(stdout, "Log: %s\n", intervention.log);
-    free(intervention.log);
     if (intervention.url != NULL) {
         fprintf(stdout, "Intervention, redirect to: %s\n", intervention.url);
         fprintf(stdout, " with status code: %d\n", intervention.status);
@@ -146,6 +145,7 @@ void kg_init_request_transaction(EvaluationRequest *request) {
 }
 
 void kg_transaction_cleanup(EvaluationRequest const *request) {
+    msc_process_logging(request->transaction);
     msc_transaction_cleanup(request->transaction);
 }
 

@@ -34,4 +34,6 @@ void kg_cleanup(char const *error, RulesSet *rules, ModSecurity *modsec);
 
 int kg_add_rule(char const *rule);
 
+
+
 #endif //KUBEGUARDLIB_LIBRARY_H
