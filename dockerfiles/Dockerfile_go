@@ -20,6 +20,6 @@ RUN wget $GO_VERSION \
     && go install github.com/go-delve/delve/cmd/dlv@latest
 COPY /config/ /config/
 COPY include/ /usr/local/include/
-COPY libkubeguard.so /usr/local/lib/libkubeguard.so
+COPY libwafie.so /usr/local/lib/libwafie.so
 RUN ldconfig
 

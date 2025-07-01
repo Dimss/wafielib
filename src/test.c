@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <kubeguardlib.h>
+#include <wafielib.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -34,7 +34,7 @@ char *read_file(const char *filename) {
 
 int main() {
     char const *config_path = "/config";
-    kg_library_init(config_path);
+    wafie_library_init(config_path);
     EvaluationRequestHeader *headers1 = malloc(sizeof(EvaluationRequestHeader) * 2);
     headers1[0].key = (const unsigned char *) "Host";
     headers1[0].value = (const unsigned char *) "example.com";
@@ -53,20 +53,20 @@ int main() {
         .body = "<html><body>Test</body></html>",
     };
 
-    kg_add_rule(
+    wafie_add_rule(
         "SecRule REMOTE_ADDR \"@ipMatch 192.168.1.2\" \"id:182374049403,phase:0,deny,status:403,msg:\'Blocking connection from specific IP\'\"");
-    // kg_add_rule("SecAction \"id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.12.0\',setvar:tx.blocking_paranoia_level=4\"");
-    // kg_add_rule("SecAction \"id:203948180384,phase:1,log,pass,msg:'FOO-PARANOIA-LEVEL: %{tx.blocking_paranoia_level}'\"");
-    // kg_add_rule("SecAction \"id:900110,phase:1,nolog,pass,t:none,setvar:tx.anomaly_score_blocking=off\"");
-    // kg_add_rule("SecAction \"id:900120,phase:1,nolog,pass,t:none,setvar:tx.inbound_anomaly_score_threshold=0\"");
-    // kg_add_rule("SecAction \"id:900130,phase:1,nolog,pass,t:none,setvar:tx.outbound_anomaly_score_threshold=0\"");
-    kg_add_rule("SecAction \"id:999999,phase:5,pass,log,msg:'Transaction complete'\"");
-    kg_init_request_transaction(&request);
-    kg_process_request_headers(&request);
-    kg_process_request_body(&request);
-    // fprintf(stdout, "headers evaluation result : %d\n", kg_process_request_headers(&request));
-    // fprintf(stdout, "body evaluation result : %d\n", kg_process_request_body(&request));
-    kg_transaction_cleanup((EvaluationRequest * const) request.transaction);
+    // wafie_add_rule("SecAction \"id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.12.0\',setvar:tx.blocking_paranoia_level=4\"");
+    // wafie_add_rule("SecAction \"id:203948180384,phase:1,log,pass,msg:'FOO-PARANOIA-LEVEL: %{tx.blocking_paranoia_level}'\"");
+    // wafie_add_rule("SecAction \"id:900110,phase:1,nolog,pass,t:none,setvar:tx.anomaly_score_blocking=off\"");
+    // wafie_add_rule("SecAction \"id:900120,phase:1,nolog,pass,t:none,setvar:tx.inbound_anomaly_score_threshold=0\"");
+    // wafie_add_rule("SecAction \"id:900130,phase:1,nolog,pass,t:none,setvar:tx.outbound_anomaly_score_threshold=0\"");
+    wafie_add_rule("SecAction \"id:999999,phase:5,pass,log,msg:'Transaction complete'\"");
+    wafie_init_request_transaction(&request);
+    wafie_process_request_headers(&request);
+    wafie_process_request_body(&request);
+    // fprintf(stdout, "headers evaluation result : %d\n", wafie_process_request_headers(&request));
+    // fprintf(stdout, "body evaluation result : %d\n", wafie_process_request_body(&request));
+    wafie_transaction_cleanup((EvaluationRequest * const) request.transaction);
 
 
 
@@ -82,21 +82,21 @@ int main() {
         .body = "<html><body>Test</body></html>",
     };
 
-    kg_add_rule(
+    wafie_add_rule(
         "SecRule REMOTE_ADDR \"@ipMatch 192.168.1.2\" \"id:182374049403,phase:0,deny,status:403,msg:\'Blocking connection from specific IP\'\"");
-    // kg_add_rule("SecAction \"id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.12.0\',setvar:tx.blocking_paranoia_level=4\"");
-    // kg_add_rule("SecAction \"id:203948180384,phase:1,log,pass,msg:'FOO-PARANOIA-LEVEL: %{tx.blocking_paranoia_level}'\"");
-    // kg_add_rule("SecAction \"id:900110,phase:1,nolog,pass,t:none,setvar:tx.anomaly_score_blocking=off\"");
-    // kg_add_rule("SecAction \"id:900120,phase:1,nolog,pass,t:none,setvar:tx.inbound_anomaly_score_threshold=0\"");
-    // kg_add_rule("SecAction \"id:900130,phase:1,nolog,pass,t:none,setvar:tx.outbound_anomaly_score_threshold=0\"");
-    kg_add_rule("SecAction \"id:999999,phase:5,pass,log,msg:'Transaction complete'\"");
-    kg_init_request_transaction(&request2);
-    kg_process_request_headers(&request2);
-    kg_process_request_body(&request2);
-    // fprintf(stdout, "headers evaluation result : %d\n", kg_process_request_headers(&request));
-    // fprintf(stdout, "body evaluation result : %d\n", kg_process_request_body(&request));
+    // wafie_add_rule("SecAction \"id:900000,phase:1,pass,t:none,nolog,tag:\'OWASP_CRS\',ver:\'OWASP_CRS/4.12.0\',setvar:tx.blocking_paranoia_level=4\"");
+    // wafie_add_rule("SecAction \"id:203948180384,phase:1,log,pass,msg:'FOO-PARANOIA-LEVEL: %{tx.blocking_paranoia_level}'\"");
+    // wafie_add_rule("SecAction \"id:900110,phase:1,nolog,pass,t:none,setvar:tx.anomaly_score_blocking=off\"");
+    // wafie_add_rule("SecAction \"id:900120,phase:1,nolog,pass,t:none,setvar:tx.inbound_anomaly_score_threshold=0\"");
+    // wafie_add_rule("SecAction \"id:900130,phase:1,nolog,pass,t:none,setvar:tx.outbound_anomaly_score_threshold=0\"");
+    wafie_add_rule("SecAction \"id:999999,phase:5,pass,log,msg:'Transaction complete'\"");
+    wafie_init_request_transaction(&request2);
+    wafie_process_request_headers(&request2);
+    wafie_process_request_body(&request2);
+    // fprintf(stdout, "headers evaluation result : %d\n", wafie_process_request_headers(&request));
+    // fprintf(stdout, "body evaluation result : %d\n", wafie_process_request_body(&request));
     free(headers1);
-    kg_transaction_cleanup((EvaluationRequest * const) request.transaction);
+    wafie_transaction_cleanup((EvaluationRequest * const) request.transaction);
 
     char *config_content = read_file("/tmp/modsec_audit.log");
     if (config_content) {

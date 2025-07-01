@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(kubeguardlib C)
+project(wafielib C)
 
 set(CMAKE_C_STANDARD 17)
 set(MODSECURITY_INCLUDE_DIRS /usr/local/modsecurity/include)
@@ -17,10 +17,10 @@ include_directories(
         ${MODSECURITY_INCLUDE_DIRS}
 )
 
-add_library(kubeguard SHARED
-        src/kubeguardlib.c)
+add_library(wafie SHARED
+        src/wafielib.c)
 
-target_link_libraries(kubeguard PRIVATE
+target_link_libraries(wafie PRIVATE
         -Wl,--whole-archive
         ${MODSECURITY_LIBRARIES}
         ${LIBPCRE2_LIBRARIES}
@@ -32,4 +32,4 @@ target_link_libraries(kubeguard PRIVATE
 )
 
 add_executable(test_hello src/test.c)
-target_link_libraries(test_hello kubeguard)
+target_link_libraries(test_hello wafie)
