@@ -4,8 +4,16 @@ on:
     branches:
       - main
 jobs:
-  build-and-upload:
-    runs-on: ubuntu-latest
+  build_on_x86:
+    name: Build on ${{ matrix.os }} (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-latest-arm64
+            arch: ARM64
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,11 +25,11 @@ jobs:
           docker run --name modsec -d dimssss/modsec:latest /bin/bash -c sleep 60
       - name: Copy libs from modsec container
         # Use 'docker cp' to copy the file to the runner's workspace
-        run: docker cp modsec:/wafie/build/libwafie.so .
+        run: docker cp modsec:/wafie/build/libwafie.so "libwafie_${{ matrix.arch }}.so"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libwafie
-          path: libwafie.so
-          
+          name: "libwafie"
+          path: libwafie_${{ matrix.arch }}.so
+
 
