@@ -1,12 +1,24 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(wafielib C)
 
+function(SET_TARGET_ARCH_LIBS)
+    if(TARGET_ARCH MATCHES "x86_64" OR TARGET_ARCH MATCHES "amd64")
+        set(TARGET_ARCH_LIBS "/usr/lib/x86_64-linux-gnu" PARENT_SCOPE)
+    else()
+        set(TARGET_ARCH_LIBS "/usr/lib/aarch64-linux-gnu" PARENT_SCOPE)
+    endif ()
+endfunction()
+
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" TARGET_ARCH)
 set(CMAKE_C_STANDARD 17)
 set(MODSECURITY_INCLUDE_DIRS /usr/local/modsecurity/include)
 set(MODSECURITY_LIBRARIES /usr/local/modsecurity/lib/libmodsecurity.a)
-set(LIBPCRE2_LIBRARIES /usr/lib/aarch64-linux-gnu/libpcre2-8.a)
-set(LIBGEOIP_LIBRARIES /usr/lib/aarch64-linux-gnu/libGeoIP.so)
-set(LIBYAJL_LIBRARIES /usr/lib/aarch64-linux-gnu/libyajl.so)
+set_target_arch_libs()
+message(STATUS "TARGET_ARCH_LIBS: ${TARGET_ARCH_LIBS}")
+
+set(LIBPCRE2_LIBRARIES "${TARGET_ARCH_LIBS}/libpcre2-8.a")
+set(LIBGEOIP_LIBRARIES "${TARGET_ARCH_LIBS}/libGeoIP.so")
+set(LIBYAJL_LIBRARIES "${TARGET_ARCH_LIBS}/libyajl.so")
 
 find_package(LibXml2 REQUIRED)
 find_package(CURL REQUIRED)
