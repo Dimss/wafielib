@@ -1,0 +1,4 @@
+/tmp/build/CMakeFiles/wafie.dir
+/tmp/build/CMakeFiles/test_hello.dir
+/tmp/build/CMakeFiles/edit_cache.dir
+/tmp/build/CMakeFiles/rebuild_cache.dir

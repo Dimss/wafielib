@@ -1,0 +1,27 @@
+name: Build and Upload to Github artifacts
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: build docker
+        run: |
+          docker build -t dimssss/modsec:latest .
+      - name: run modsec container in background
+        run: |
+          docker run --name modsec -d dimssss/modsec:latest /bin/bash -c sleep 60
+      - name: Copy libs from modsec container
+        # Use 'docker cp' to copy the file to the runner's workspace
+        run: docker cp modsec:/wafie/build/libwafie.so .
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libwafie
+          path: libwafie.so
+          
+

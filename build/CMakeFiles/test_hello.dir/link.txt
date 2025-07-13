@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/test_hello.dir/src/test.c.o -o test_hello  -Wl,-rpath,/tmp/build libwafie.so 
