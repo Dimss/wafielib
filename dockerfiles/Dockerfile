@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy:contrib-v1.34.1
+FROM debian:bookworm-slim
 RUN apt -y update \
     && apt install -y \
     apt-utils \

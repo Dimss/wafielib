@@ -14,11 +14,14 @@ typedef struct {
     char *http_version;
     char *body;
     size_t headers_count;
+    char *config_path;
+    int *total_loaded_rules;
     EvaluationRequestHeader *headers;
     Transaction *transaction;
+    RulesSet *rules;
 } EvaluationRequest;
 
-void wafie_library_init(char const *config_path);
+void wafie_library_init();
 
 int wafie_process_request_headers(EvaluationRequest const *request);
 
@@ -31,9 +34,5 @@ void wafie_transaction_cleanup(EvaluationRequest const *request);
 void wafie_dump_rules();
 
 void wafie_cleanup(char const *error, RulesSet *rules, ModSecurity *modsec);
-
-int wafie_add_rule(char const *rule);
-
-
 
 #endif //WAFIELIB_LIBRARY_H
