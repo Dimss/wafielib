@@ -15,24 +15,19 @@ typedef struct {
     char *body;
     size_t headers_count;
     char *config_path;
-    int *total_loaded_rules;
+    int total_loaded_rules;
     EvaluationRequestHeader *headers;
     Transaction *transaction;
     RulesSet *rules;
+    ModSecurity *modsec;
 } EvaluationRequest;
 
-void wafie_library_init();
+void wafie_init(EvaluationRequest *request);
+
+void wafie_cleanup(EvaluationRequest const *request);
 
 int wafie_process_request_headers(EvaluationRequest const *request);
 
 int wafie_process_request_body(EvaluationRequest const *request);
-
-void wafie_init_request_transaction(EvaluationRequest *request);
-
-void wafie_transaction_cleanup(EvaluationRequest const *request);
-
-void wafie_dump_rules();
-
-void wafie_cleanup(char const *error, RulesSet *rules, ModSecurity *modsec);
 
 #endif //WAFIELIB_LIBRARY_H

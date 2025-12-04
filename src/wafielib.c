@@ -1,13 +1,11 @@
 #include "wafielib.h"
-
+#include <time.h>
 #include <stdio.h>
 #include <dirent.h>
 #include "modsecurity/rules_set.h"
 #include "modsecurity/modsecurity.h"
 #include "modsecurity/transaction.h"
 #include "modsecurity/intervention.h"
-
-ModSecurity *modsec;
 
 ModSecurityIntervention wafie_new_intervention() {
     ModSecurityIntervention intervention;
@@ -24,14 +22,8 @@ void wafie_log_cb(void *data, const void *msg) {
     fprintf(stderr, "%s\n", (const char *) msg);
 }
 
-// init modsec library
-void wafie_library_init() {
-    modsec = msc_init();
-    msc_set_log_cb(modsec, wafie_log_cb);
-    msc_set_connector_info(modsec, "wafie v0.0.2-alpha");
-}
-
-static void wafie_load_main_configs(const EvaluationRequest *request) {
+static void wafie_load_main_configs(EvaluationRequest *request) {
+    fprintf(stdout, "[libwafie: %s] loading main configuration \n", request->config_path);
     char **main_config_files = (char *[]){
         "modsecurity.conf",
         "crs-setup.conf",
@@ -49,11 +41,12 @@ static void wafie_load_main_configs(const EvaluationRequest *request) {
                 msc_rules_error_cleanup(error);
             }
         }
-        *request->total_loaded_rules += ret;
+        request->total_loaded_rules += ret;
     }
 }
 
-static void wafie_load_modescurity_rules_configs(const EvaluationRequest *request) {
+static void wafie_load_modescurity_rules_configs(EvaluationRequest *request) {
+    fprintf(stdout, "[libwafie: %s] loading rules \n", request->config_path);
     const char *error = NULL;
     // const char *config_file_suffix = ".conf";
     // 7 = strlen("/rules") + 1
@@ -81,35 +74,52 @@ static void wafie_load_modescurity_rules_configs(const EvaluationRequest *reques
                     msc_rules_error_cleanup(error);
                 }
             }
-            printf("loading rule file: %s\n", (const char *) rule_file);
-            *request->total_loaded_rules += ret;
+            // printf("loading rule file: %s\n", (const char *) rule_file);
+            request->total_loaded_rules += ret;
         }
     }
     closedir(dp);
 }
 
-static void wafie_load_modsecuirty_configuration(const EvaluationRequest *request) {
+static void wafie_load_modsecuirty_configuration(EvaluationRequest *request) {
     // load main configurations files
     wafie_load_main_configs(request);
     // load the rules files
     wafie_load_modescurity_rules_configs(request);
     // print the total loaded rules
-    fprintf(stdout, "[wafielib] total rules loaded: %d\n", *request->total_loaded_rules);
+    fprintf(stdout, "[libwafie: %s] total rules loaded: %d\n", request->config_path, request->total_loaded_rules);
 }
 
 // init transaction
-void wafie_init_request_transaction(EvaluationRequest *request) {
+void wafie_init(EvaluationRequest *request) {
+    struct timespec start, end;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    fprintf(stdout, "[libwafie: %s] initializing evaluation request\n", request->config_path);
+    // init modesc
+    request->modsec = msc_init();
+    msc_set_log_cb(request->modsec, wafie_log_cb);
+    msc_set_connector_info(request->modsec, "wafie v0.0.2-alpha");
+    // load rules
+    request->total_loaded_rules = 0;
     request->rules = msc_create_rules_set();
     wafie_load_modsecuirty_configuration(request);
-    // create new transaction
-    request->transaction = msc_new_transaction(modsec, request->rules, NULL);
+    // init transaction
+    request->transaction = msc_new_transaction(request->modsec, request->rules, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
+    double elapsed_ms = elapsed_ns / 1000000.0;
+    fprintf(stdout, "[libwafie: %s] evaluation request initialization took  %.3f ms\n",
+            request->config_path, elapsed_ms);
 }
 
 // cleanup transaction
-void wafie_transaction_cleanup(EvaluationRequest const *request) {
+void wafie_cleanup(EvaluationRequest const *request) {
     msc_process_logging(request->transaction);
     msc_rules_cleanup(request->rules);
     msc_transaction_cleanup(request->transaction);
+    msc_cleanup(request->modsec);
 }
 
 // intervention flow
@@ -142,6 +152,10 @@ int wafie_process_intervention(Transaction *transaction) {
 
 // process headers
 int wafie_process_request_headers(EvaluationRequest const *request) {
+    struct timespec start, end;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    fprintf(stdout, "[libwafie: %s] processing request headers \n", request->config_path);
     int intervention_status = 0;
     // process connection
     msc_process_connection(request->transaction, request->client_ip, 0, "0.0.0.0", 0);
@@ -150,9 +164,9 @@ int wafie_process_request_headers(EvaluationRequest const *request) {
         return intervention_status;
     }
     // process URI and request headers
-    fprintf(stdout, "[libwafie] request uri -> %s\n", request->uri);
-    fprintf(stdout, "[libwafie] request method -> %s\n", request->http_method);
-    fprintf(stdout, "[libwafie] request version -> %s\n", request->http_version);
+    fprintf(stdout, "[libwafie: %s] request uri -> %s\n", request->config_path, request->uri);
+    fprintf(stdout, "[libwafie: %s] request method -> %s\n", request->config_path, request->http_method);
+    fprintf(stdout, "[libwafie: %s] request version -> %s\n", request->config_path, request->http_version);
     msc_process_uri(request->transaction, request->uri, request->http_method, request->http_version);
     intervention_status = wafie_process_intervention(request->transaction);
     if (intervention_status != 0) {
@@ -160,11 +174,20 @@ int wafie_process_request_headers(EvaluationRequest const *request) {
     }
     for (size_t i = 0; i < request->headers_count; i++) {
         msc_add_request_header(request->transaction, request->headers[i].key, request->headers[i].value);
-        fprintf(stdout, "[libwafie] request header -> %s: %s\n", (const char *) request->headers[i].key,
+        fprintf(stdout, "[libwafie: %s] request header -> %s: %s\n",
+                request->config_path,
+                (const char *) request->headers[i].key,
                 (const char *) request->headers[i].value);
     }
     msc_process_request_headers(request->transaction);
     intervention_status = wafie_process_intervention(request->transaction);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
+    double elapsed_ms = elapsed_ns / 1000000.0;
+    fprintf(stdout, "[libwafie: %s] processing request headers took  %.3f ms\n",
+            request->config_path, elapsed_ms);
+
     if (intervention_status != 0) {
         return intervention_status;
     }
@@ -173,9 +196,14 @@ int wafie_process_request_headers(EvaluationRequest const *request) {
 
 // process body
 int wafie_process_request_body(EvaluationRequest const *request) {
+    struct timespec start, end;
+
+
+    fprintf(stdout, "[libwafie: %s] processing request body \n", request->config_path);
     int intervention_status = 0;
     // process request body
     if (request->body != NULL) {
+        clock_gettime(CLOCK_MONOTONIC, &start);
         // append request body
         msc_append_request_body(request->transaction,
                                 (const unsigned char *) request->body,
@@ -184,6 +212,13 @@ int wafie_process_request_body(EvaluationRequest const *request) {
         msc_process_request_body(request->transaction);
         // check for intervention
         intervention_status = wafie_process_intervention(request->transaction);
+        clock_gettime(CLOCK_MONOTONIC, &end);
+
+        long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
+        double elapsed_ms = elapsed_ns / 1000000.0;
+        fprintf(stdout, "[libwafie: %s] processing request body took  %.3f ms\n",
+                request->config_path, elapsed_ms);
+
         if (intervention_status != 0) {
             return intervention_status;
         }
