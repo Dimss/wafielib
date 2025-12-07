@@ -41,4 +41,6 @@ RUN cd /ModSecurity \
     && ./configure \
     && make \
     && make install
-COPY /config/ /config/
+COPY /config/ /config1/
+COPY /config/ /config2/
+COPY /config/ /config3/
