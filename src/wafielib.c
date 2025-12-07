@@ -2,13 +2,16 @@
 #include <time.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <pthread.h>
 #include "modsecurity/rules_set.h"
 #include "modsecurity/modsecurity.h"
 #include "modsecurity/transaction.h"
 #include "modsecurity/intervention.h"
 
+
 ModSecurity *modsec;
 WafieRuleSet *wrs[1000];
+pthread_rwlock_t ruleset_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 ModSecurityIntervention wafie_new_intervention() {
     ModSecurityIntervention intervention;
@@ -89,13 +92,13 @@ void wafie_init() {
     modsec = msc_init();
     msc_set_log_cb(modsec, wafie_log_cb);
     msc_set_connector_info(modsec, "wafie v0.0.2-alpha");
-    // rules = msc_create_rules_set();
 }
 
 void wafie_load_rule_sets(WafieRuleSetConfig cfg[], const int cfg_size) {
+    // lock rules for RW
+    pthread_rwlock_wrlock(&ruleset_lock);
+    WafieRuleSet *wrs_swap[1000];
     for (int i = 0; i < cfg_size; i++) {
-        // WafieRuleSet w = WafieRuleSet{.protection_id = cfg[i].protection_id};
-        // WafieRuleSet *w = malloc(sizeof(WafieRuleSet));
         wrs[i] = malloc(sizeof(WafieRuleSet));
         wrs[i]->protection_id = cfg[i].protection_id;
         wrs[i]->rules = msc_create_rules_set();
@@ -104,6 +107,8 @@ void wafie_load_rule_sets(WafieRuleSetConfig cfg[], const int cfg_size) {
         // load the rules files
         wafie_load_modescurity_rules_configs(wrs[i]->rules, cfg[i].config_path, wrs[i]->protection_id);
     }
+    // unlock rules for RW
+    pthread_rwlock_unlock(&ruleset_lock);
 }
 
 // init transaction
@@ -111,6 +116,7 @@ void wafie_init_transaction(WafieEvaluationRequest *request) {
     struct timespec start, end;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
+    pthread_rwlock_rdlock(&ruleset_lock);
     fprintf(stdout, "[libwafie: protection id - %d] initializing evaluation request\n", request->protection_id);
     // init modesc
     // request->modsec = msc_init();
@@ -129,6 +135,7 @@ void wafie_init_transaction(WafieEvaluationRequest *request) {
         }
     }
     request->transaction = msc_new_transaction(modsec, wrs[rule_set_idx]->rules, NULL);
+    pthread_rwlock_unlock(&ruleset_lock);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
     long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
