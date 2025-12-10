@@ -35,9 +35,9 @@ void wafie_log_cb(void *data, const void *msg) {
     fprintf(stderr, "%s\n", (const char *) msg);
 }
 
-static void wafie_load_main_configs(RulesSet *rule_set, char *config_path, int protection_id) {
-    fprintf(stdout, "[libwafie.wafie_load_main_configs.protection.id: %d] loading main configuration \n",
-            protection_id);
+static void wafie_load_main_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
+    fprintf(stdout, "[libwafie.wafie_load_main_configs.protection.id: %d] path %s loading main configuration \n",
+            protection_id, config_path);
     char **main_config_files = (char *[]){
         "modsecurity.conf",
         "crs-setup.conf",
@@ -46,10 +46,12 @@ static void wafie_load_main_configs(RulesSet *rule_set, char *config_path, int p
     for (size_t i = 0; i < 2; i++) {
         char conf_file[strlen(main_config_files[i]) + strlen(config_path) + 2];
         snprintf(conf_file, sizeof(conf_file), "%s/%s", config_path, main_config_files[i]);
-        // fprintf(stdout, "loading rule file: %s\n", conf_file);
+        fprintf(stdout, "[libwafie.wafie_load_main_configs.protection.id: %d] loading rule file: %s\n",
+                protection_id, conf_file);
         int const ret = msc_rules_add_file(rule_set, conf_file, &error);
         if (ret < 0) {
-            fprintf(stderr, "problems loading the rules --\n");
+            fprintf(stderr, "[libwafie.wafie_load_main_configs.protection.id: %d] problems loading the rules \n",
+                    protection_id);
             fprintf(stderr, "%s\n", error);
             if (error != NULL) {
                 msc_rules_error_cleanup(error);
@@ -58,7 +60,7 @@ static void wafie_load_main_configs(RulesSet *rule_set, char *config_path, int p
     }
 }
 
-static void wafie_load_modescurity_rules_configs(RulesSet *rule_set, char *config_path, int protection_id) {
+static void wafie_load_modescurity_rules_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
     fprintf(stdout, "[libwafie.wafie_load_modescurity_rules_configs.protection.id: %d] loading rules \n",
             protection_id);
     const char *error = NULL;
@@ -174,6 +176,7 @@ void wafie_init_transaction(WafieEvaluationRequest *request) {
 
 // cleanup transaction
 void wafie_cleanup(WafieEvaluationRequest const *request) {
+    if (request->transaction == NULL) return;
     msc_process_logging(request->transaction);
     msc_transaction_cleanup(request->transaction);
 }
@@ -208,6 +211,12 @@ int wafie_process_intervention(Transaction *transaction) {
 
 // process headers
 int wafie_process_request_headers(WafieEvaluationRequest const *request) {
+    if (request->transaction == NULL) {
+        fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] transaction is NULL, skipping \n",
+                request->protection_id);
+        return 0;
+    }
+
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] processing request \n",
@@ -231,7 +240,7 @@ int wafie_process_request_headers(WafieEvaluationRequest const *request) {
     msc_process_uri(request->transaction, request->uri, request->http_method, request->http_version);
     intervention_status = wafie_process_intervention(request->transaction);
     if (intervention_status != 0) {
-        return intervention_status;
+        goto finish_processing;
     }
     for (size_t i = 0; i < request->headers_count; i++) {
         msc_add_request_header(request->transaction, request->headers[i].key, request->headers[i].value);
@@ -240,10 +249,18 @@ int wafie_process_request_headers(WafieEvaluationRequest const *request) {
                 (const char *) request->headers[i].key,
                 (const char *) request->headers[i].value);
     }
+    // process headers phase
     msc_process_request_headers(request->transaction);
     intervention_status = wafie_process_intervention(request->transaction);
+    if (intervention_status != 0) {
+        goto finish_processing;
+    }
+    // process body phase
+    msc_process_request_body(request->transaction);
+    intervention_status = wafie_process_intervention(request->transaction);
+    // unconditionally finish processing once intervention detected
+finish_processing:
     clock_gettime(CLOCK_MONOTONIC, &end);
-
     long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
     double elapsed_ms = elapsed_ns / 1000000.0;
     fprintf(
@@ -258,6 +275,11 @@ int wafie_process_request_headers(WafieEvaluationRequest const *request) {
 
 // process body
 int wafie_process_request_body(WafieEvaluationRequest const *request) {
+    if (request->transaction == NULL) {
+        fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] transaction is NULL, skipping \n",
+                request->protection_id);
+        return 0;
+    }
     struct timespec start, end;
     fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] processing request\n",
             request->protection_id);

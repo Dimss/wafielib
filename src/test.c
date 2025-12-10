@@ -79,96 +79,26 @@ int main() {
     //
     WafieEvaluationRequest request1 = {
         .client_ip = "192.168.1.2",
-        .uri = "/etc/passwd",
+        // .uri = "/etc/passwd",
+        // .uri = "?id=1/**/UNION/**/SELECT/**/'<script>alert(1)</script>'",
+        .uri = "/?id=1/**/UNION/**/SELECT/**/%27%3Cscript%3Ealert(1)%3C/script%3E%27",
         .http_method = "GET",
         .http_version = "1.1",
         .headers_count = 2,
         .headers = headers1,
-        .body = "",
+        // .body = "",
         .protection_id = 1,
-    };
-    WafieEvaluationRequest request2 = {
-        .client_ip = "192.168.1.3",
-        .uri = "/foo/bar",
-        .http_method = "GET",
-        .http_version = "1.2",
-        .headers_count = 2,
-        .headers = headers1,
-        .body = "",
-        .protection_id = 2,
-    };
-    WafieEvaluationRequest request3 = {
-        .client_ip = "192.168.1.3",
-        .uri = "/foo/bar",
-        .http_method = "GET",
-        .http_version = "1.2",
-        .headers_count = 2,
-        .headers = headers1,
-        .body = "",
-        .protection_id = 3,
-    };
-    WafieEvaluationRequest request4 = {
-        .client_ip = "192.168.1.3",
-        .uri = "/foo/bar",
-        .http_method = "GET",
-        .http_version = "1.2",
-        .headers_count = 2,
-        .headers = headers1,
-        .body = "",
-        .protection_id = 3,
-    };
-    WafieEvaluationRequest request5 = {
-        .client_ip = "192.168.1.3",
-        .uri = "/foo/bar",
-        .http_method = "GET",
-        .http_version = "1.2",
-        .headers_count = 2,
-        .headers = headers1,
-        .body = "",
-        .protection_id = 3,
-    };
-    WafieEvaluationRequest request6 = {
-        .client_ip = "192.168.1.3",
-        .uri = "/foo/bar",
-        .http_method = "GET",
-        .http_version = "1.2",
-        .headers_count = 2,
-        .headers = headers1,
-        .body = "",
-        .protection_id = 2,
     };
 
 
     wafie_init();
     wafie_load_rule_sets(cfg, 2);
+    wafie_init_transaction(&request1);
+    wafie_process_request_headers(&request1);
+    wafie_process_request_body(&request1);
+    wafie_cleanup(&request1);
 
-    pthread_t thread1;
-    pthread_t thread2;
-    pthread_t thread3;
-    pthread_t thread4;
-    pthread_t thread5;
-    pthread_t thread6;
-    pthread_t thread_reload_ruleset;
 
-    const int t1 = pthread_create(&thread1, NULL, evalu_request, &request1);
-    const int t2 = pthread_create(&thread2, NULL, evalu_request, &request2);
-    const int th7 = pthread_create(&thread_reload_ruleset, NULL, reload_ruleset, NULL);
-    const int t3 = pthread_create(&thread3, NULL, evalu_request, &request3);
-    const int t4 = pthread_create(&thread4, NULL, evalu_request, &request4);
-    const int t5 = pthread_create(&thread5, NULL, evalu_request, &request5);
-    const int t6 = pthread_create(&thread6, NULL, evalu_request, &request6);
-    if (t1 || t2 || t3 || t4 || t5 || t6 || th7) {
-        fprintf(stderr, "Error - pthread_create() return code: %d\n", t1 || t2);
-        exit(EXIT_FAILURE);
-    }
-
-    pthread_join(thread1, NULL);
-    pthread_join(thread2, NULL);
-    pthread_join(thread3, NULL);
-    pthread_join(thread4, NULL);
-    pthread_join(thread5, NULL);
-    pthread_join(thread6, NULL);
-    pthread_join(thread_reload_ruleset, NULL);
 
     free(headers1);
 
