@@ -44,3 +44,4 @@ RUN cd /ModSecurity \
 COPY /config/ /config1/
 COPY /config/ /config2/
 COPY /config/ /config3/
+COPY new-conf /tmp/newconfig

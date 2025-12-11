@@ -35,7 +35,8 @@ void wafie_log_cb(void *data, const void *msg) {
     fprintf(stderr, "%s\n", (const char *) msg);
 }
 
-static void wafie_load_main_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
+static int wafie_load_main_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
+    int rules_count = 0;
     fprintf(stdout, "[libwafie.wafie_load_main_configs.protection.id: %d] path %s loading main configuration \n",
             protection_id, config_path);
     char **main_config_files = (char *[]){
@@ -57,10 +58,13 @@ static void wafie_load_main_configs(RulesSet *rule_set, char *config_path, uint3
                 msc_rules_error_cleanup(error);
             }
         }
+        rules_count++;
     }
+    return rules_count;
 }
 
-static void wafie_load_modescurity_rules_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
+static int wafie_load_modescurity_rules_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
+    int rules_count = 0;
     fprintf(stdout, "[libwafie.wafie_load_modescurity_rules_configs.protection.id: %d] loading rules \n",
             protection_id);
     const char *error = NULL;
@@ -72,7 +76,7 @@ static void wafie_load_modescurity_rules_configs(RulesSet *rule_set, char *confi
     DIR *dp = opendir(rules_path);
     if (dp == NULL) {
         perror("opendir");
-        return;
+        return -1;
     }
     // load the rules files
     while ((entry = readdir(dp))) {
@@ -92,9 +96,11 @@ static void wafie_load_modescurity_rules_configs(RulesSet *rule_set, char *confi
             }
             // printf("loading rule file: %s\n", (const char *) rule_file);
             // request->total_loaded_rules += ret;
+            rules_count++;
         }
     }
     closedir(dp);
+    return rules_count;
 }
 
 void wafie_init() {
@@ -113,9 +119,12 @@ void wafie_load_rule_sets(WafieRuleSetConfig cfg[], const int cfg_size) {
         wrs_swap[i]->protection_id = cfg[i].protection_id;
         wrs_swap[i]->rules = msc_create_rules_set();
         // load main configurations files
-        wafie_load_main_configs(wrs_swap[i]->rules, cfg[i].config_path, wrs_swap[i]->protection_id);
+        int rules_count = wafie_load_main_configs(wrs_swap[i]->rules, cfg[i].config_path, wrs_swap[i]->protection_id);
         // load the rules files
-        wafie_load_modescurity_rules_configs(wrs_swap[i]->rules, cfg[i].config_path, wrs_swap[i]->protection_id);
+        rules_count += wafie_load_modescurity_rules_configs(wrs_swap[i]->rules, cfg[i].config_path,
+                                                            wrs_swap[i]->protection_id);
+        fprintf(stdout, "[libwafie.wafie_load_rule_sets] loaded: %d rules for protection: %d \n", rules_count,
+                wrs_swap[i]->protection_id);
     }
     // lock rules for RW
     pthread_rwlock_wrlock(&ruleset_lock);
@@ -182,29 +191,30 @@ void wafie_cleanup(WafieEvaluationRequest const *request) {
 }
 
 // intervention flow
-int wafie_process_intervention(Transaction *transaction) {
+int wafie_process_intervention(Transaction *transaction, const uint32_t protection_id) {
     ModSecurityIntervention intervention = wafie_new_intervention();
-    if (msc_intervention(transaction, &intervention) == 0) {
-        return 0;
-    }
-    if (intervention.log != NULL) {
-        fprintf(stdout, "%s\n", intervention.log);
-        free(intervention.log);
-        intervention.log = NULL;
-    }
-    if (intervention.url != NULL) {
-        fprintf(stdout, "Intervention, redirect to: %s\n", intervention.url);
-        fprintf(stdout, " with status code: %d\n", intervention.status);
-        free(intervention.url);
-        intervention.url = NULL;
-        return intervention.status;
-    }
-    if (intervention.status != 200) {
-        fprintf(stdout, "Intervention, returning code: %d\n", intervention.status);
-        return intervention.status;
-    }
-    if (intervention.disruptive != 0) {
-        return intervention.disruptive;
+    if (msc_intervention(transaction, &intervention)) {
+        fprintf(stdout, "[libwafie.wafie_process_intervention.protection.id: %d] intervention triggered \n",
+                protection_id);
+        if (intervention.log != NULL) {
+            fprintf(stdout, "%s\n", intervention.log);
+            free(intervention.log);
+            intervention.log = NULL;
+        }
+        if (intervention.url != NULL) {
+            fprintf(stdout, "Intervention, redirect to: %s\n", intervention.url);
+            fprintf(stdout, " with status code: %d\n", intervention.status);
+            free(intervention.url);
+            intervention.url = NULL;
+            return intervention.status;
+        }
+        if (intervention.status != 200) {
+            return intervention.status;
+        }
+        if (intervention.disruptive != 0) {
+            return intervention.disruptive;
+        }
+        return 1;
     }
     return 0;
 }
@@ -224,11 +234,13 @@ int wafie_process_request_headers(WafieEvaluationRequest const *request) {
     int intervention_status = 0;
     // process connection
     msc_process_connection(request->transaction, request->client_ip, 0, "0.0.0.0", 0);
-    intervention_status = wafie_process_intervention(request->transaction);
+    intervention_status = wafie_process_intervention(request->transaction, request->protection_id);
     if (intervention_status != 0) {
-        return intervention_status;
+        goto finish_processing;
     }
     // process URI and request headers
+    fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] client_ip -> %s\n",
+        request->protection_id, request->client_ip);
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] uri -> %s\n",
             request->protection_id, request->uri);
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] method -> %s\n",
@@ -237,8 +249,9 @@ int wafie_process_request_headers(WafieEvaluationRequest const *request) {
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] version -> %s\n",
             request->protection_id,
             request->http_version);
+
     msc_process_uri(request->transaction, request->uri, request->http_method, request->http_version);
-    intervention_status = wafie_process_intervention(request->transaction);
+    intervention_status = wafie_process_intervention(request->transaction, request->protection_id);
     if (intervention_status != 0) {
         goto finish_processing;
     }
@@ -249,15 +262,19 @@ int wafie_process_request_headers(WafieEvaluationRequest const *request) {
                 (const char *) request->headers[i].key,
                 (const char *) request->headers[i].value);
     }
+    fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] processing headers\n",
+            request->protection_id);
     // process headers phase
     msc_process_request_headers(request->transaction);
-    intervention_status = wafie_process_intervention(request->transaction);
+    intervention_status = wafie_process_intervention(request->transaction, request->protection_id);
     if (intervention_status != 0) {
         goto finish_processing;
     }
     // process body phase
+    fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] processing body\n",
+            request->protection_id);
     msc_process_request_body(request->transaction);
-    intervention_status = wafie_process_intervention(request->transaction);
+    intervention_status = wafie_process_intervention(request->transaction, request->protection_id);
     // unconditionally finish processing once intervention detected
 finish_processing:
     clock_gettime(CLOCK_MONOTONIC, &end);
@@ -266,10 +283,8 @@ finish_processing:
     fprintf(
         stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] processing request took  %.3f ms\n",
         request->protection_id, elapsed_ms);
-
-    if (intervention_status != 0) {
-        return intervention_status;
-    }
+    fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] intervention status: %d\n",
+            request->protection_id, intervention_status);
     return intervention_status;
 }
 
@@ -281,11 +296,11 @@ int wafie_process_request_body(WafieEvaluationRequest const *request) {
         return 0;
     }
     struct timespec start, end;
-    fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] processing request\n",
-            request->protection_id);
     int intervention_status = 0;
     // process request body
     if (request->body != NULL) {
+        fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] processing request\n",
+                request->protection_id);
         clock_gettime(CLOCK_MONOTONIC, &start);
         // append request body
         msc_append_request_body(request->transaction,
@@ -294,7 +309,7 @@ int wafie_process_request_body(WafieEvaluationRequest const *request) {
         // process request body
         msc_process_request_body(request->transaction);
         // check for intervention
-        intervention_status = wafie_process_intervention(request->transaction);
+        intervention_status = wafie_process_intervention(request->transaction, request->protection_id);
         clock_gettime(CLOCK_MONOTONIC, &end);
 
         long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);

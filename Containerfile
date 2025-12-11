@@ -42,6 +42,7 @@ RUN cd /ModSecurity \
     && make \
     && make install
 COPY config/ /config
+COPY new-conf/ /tmp/new-conf
 COPY include/ /wafie/include
 COPY src/ /wafie/src
 COPY CMakeLists.txt /wafie
