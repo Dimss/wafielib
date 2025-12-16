@@ -61,57 +61,33 @@ void *reload_ruleset(void *ptr) {
     return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
+    // WafieRuleSetConfig *cfg = malloc(sizeof(WafieRuleSetConfig) * 2);
     WafieRuleSetConfig cfg[2];
     cfg[0].protection_id = 1;
-    cfg[0].config_path = "/tmp/newconfig";
-    if (argc > 1) {
-        printf("using config from: %s \n", argv[1]);
-        cfg[0].config_path = argv[1];
-    }
+    cfg[0].config_path = "/config1";
+    // cfg[1].protection_id = 2;
+    // cfg[1].config_path = "/config2";
 
 
+    WafieEvaluationRequestHeader *headers1 = malloc(sizeof(WafieEvaluationRequestHeader) * 2);
+    headers1[0].key = (const unsigned char *) "Host";
+    headers1[0].value = (const unsigned char *) "example.com";
+    headers1[1].key = (const unsigned char *) "User-Agent";
+    headers1[1].value = (const unsigned char *) "KubeGuard/1.0";
     //
-    WafieEvaluationRequestHeader *headers = malloc(sizeof(WafieEvaluationRequestHeader) * 14);
-    headers[0].key = (const unsigned char *) ":authority:";
-    headers[0].value = (const unsigned char *) "wp.10.100.102.92.nip.io";
-    headers[1].key = (const unsigned char *) ":path:";
-    headers[1].value = (const unsigned char *) "/?id=1/**/UNION/**/SELECT/**/%27%3Cscript%3Ealert(1)%3C/script%3E%27";
-    headers[2].key = (const unsigned char *) ":method:";
-    headers[2].value = (const unsigned char *) "GET";
-    headers[3].key = (const unsigned char *) ":scheme:";
-    headers[3].value = (const unsigned char *) "http";
-    headers[4].key = (const unsigned char *) "x-request-id";
-    headers[4].value = (const unsigned char *) "2aa12cf48d6a515c00be63ced517d1e5";
-    headers[5].key = (const unsigned char *) "x-real-ip";
-    headers[5].value = (const unsigned char *) "10.244.0.1";
-    headers[6].key = (const unsigned char *) "x-forwarded-for";
-    headers[6].value = (const unsigned char *) "10.244.0.1";
-    headers[7].key = (const unsigned char *) "x-forwarded-host";
-    headers[7].value = (const unsigned char *) "wp.10.100.102.92.nip.io";
-    headers[8].key = (const unsigned char *) "x-forwarded-port";
-    headers[8].value = (const unsigned char *) "80";
-    headers[9].key = (const unsigned char *) "x-forwarded-proto";
-    headers[9].value = (const unsigned char *) "http";
-    headers[10].key = (const unsigned char *) "x-forwarded-scheme";
-    headers[10].value = (const unsigned char *) "http";
-    headers[11].key = (const unsigned char *) "user-agent";
-    headers[11].value = (const unsigned char *) "curl/8.7.1";
-    headers[12].key = (const unsigned char *) "accept";
-    headers[12].value = (const unsigned char *) " */*";
-    headers[13].key = (const unsigned char *) "host";
-    headers[13].value = (const unsigned char *) "wp.10.100.102.92.nip.io";
-
-    // //
+    //
     WafieEvaluationRequest request1 = {
         .client_ip = "192.168.1.2",
-        .uri = "/?id=1/**/UNION/**/SELECT/**/%27%3Cscript%3Ealert(1)%3C/script%3E%27",
+        .uri = "/",
         .http_method = "GET",
         .http_version = "1.1",
         .headers_count = 2,
-        .headers = headers,
+        .headers = headers1,
+        // .body = "",
         .protection_id = 1,
     };
+
 
     wafie_init();
     wafie_load_rule_sets(cfg, 1);
@@ -122,7 +98,7 @@ int main(int argc, char *argv[]) {
 
 
 
-    free(headers);
+    free(headers1);
 
     char *audit_content = read_file("/tmp/modsec_audit.log");
     if (audit_content) {

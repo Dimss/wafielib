@@ -35,6 +35,20 @@ void wafie_log_cb(void *data, const void *msg) {
     fprintf(stderr, "%s\n", (const char *) msg);
 }
 
+int csr_conf_files_only(const struct dirent *entry) {
+    const char *name = entry->d_name;
+    const size_t len = strlen(name);
+    // Filter out "." and ".." just in case
+    if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+        return 0;
+    }
+    // Check if it ends with ".conf"
+    if (len > 5 && strcmp(name + len - 5, ".conf") == 0) {
+        return 1; // Keep it
+    }
+    return 0;
+}
+
 static int wafie_load_main_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
     int rules_count = 0;
     fprintf(stdout, "[libwafie.wafie_load_main_configs.protection.id: %d] path %s loading main configuration \n",
@@ -64,42 +78,34 @@ static int wafie_load_main_configs(RulesSet *rule_set, char *config_path, uint32
 }
 
 static int wafie_load_modescurity_rules_configs(RulesSet *rule_set, char *config_path, uint32_t protection_id) {
-    int rules_count = 0;
     fprintf(stdout, "[libwafie.wafie_load_modescurity_rules_configs.protection.id: %d] loading rules \n",
             protection_id);
     const char *error = NULL;
-    // const char *config_file_suffix = ".conf";
     // 7 = strlen("/rules") + 1
     char rules_path[strlen(config_path) + 7];
     snprintf(rules_path, sizeof(rules_path), "%s/rules", config_path);
-    struct dirent *entry;
-    DIR *dp = opendir(rules_path);
-    if (dp == NULL) {
-        perror("opendir");
-        return -1;
+    struct dirent **namelist;
+    const int rules_count = scandir(rules_path, &namelist, csr_conf_files_only, alphasort);
+    if (rules_count < 0) {
+        perror("scandir");
+        return rules_count;
     }
-    // load the rules files
-    while ((entry = readdir(dp))) {
-        if (entry->d_type == DT_REG) {
-            // char const *is_config_file = strstr(entry->d_name, config_file_suffix);
-            char const *is_config_file = strstr(entry->d_name, ".conf");
-            if (is_config_file == NULL) continue;
-            char rule_file[strlen(rules_path) + strlen(entry->d_name) + 2];
-            snprintf(rule_file, sizeof(rule_file), "%s/%s", rules_path, entry->d_name);
-            int const ret = msc_rules_add_file(rule_set, rule_file, &error);
-            if (ret < 0) {
-                fprintf(stderr, "problems loading the rules --\n");
-                fprintf(stderr, "%s\n", error);
-                if (error != NULL) {
-                    msc_rules_error_cleanup(error);
-                }
+    for (int i = 0; i < rules_count; i++) {
+        char rule_file[strlen(rules_path) + strlen(namelist[i]->d_name) + 2];
+        snprintf(rule_file, sizeof(rule_file), "%s/%s", rules_path, namelist[i]->d_name);
+        int const ret = msc_rules_add_file(rule_set, rule_file, &error);
+        if (ret < 0) {
+            fprintf(stderr, "problems loading the rules --\n");
+            fprintf(stderr, "%s\n", error);
+            if (error != NULL) {
+                msc_rules_error_cleanup(error);
             }
-            // printf("loading rule file: %s\n", (const char *) rule_file);
-            // request->total_loaded_rules += ret;
-            rules_count++;
         }
+        printf("[libwafie.wafie_load_modescurity_rules_configs.protection.id: %d] rule file: %s\n",
+               protection_id, (const char *) rule_file);
+        free(namelist[i]);
     }
-    closedir(dp);
+    free(namelist);
     return rules_count;
 }
 
@@ -240,7 +246,7 @@ int wafie_process_request_headers(WafieEvaluationRequest const *request) {
     }
     // process URI and request headers
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] client_ip -> %s\n",
-        request->protection_id, request->client_ip);
+            request->protection_id, request->client_ip);
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] uri -> %s\n",
             request->protection_id, request->uri);
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] method -> %s\n",
