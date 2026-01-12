@@ -19,6 +19,7 @@ message(STATUS "TARGET_ARCH_LIBS: ${TARGET_ARCH_LIBS}")
 set(LIBPCRE2_LIBRARIES "${TARGET_ARCH_LIBS}/libpcre2-8.a")
 set(LIBGEOIP_LIBRARIES "${TARGET_ARCH_LIBS}/libGeoIP.so")
 set(LIBYAJL_LIBRARIES "${TARGET_ARCH_LIBS}/libyajl.so")
+set(LIBLUA_LIBRARIES "${TARGET_ARCH_LIBS}/liblua5.4.so.0")
 
 find_package(LibXml2 REQUIRED)
 find_package(CURL REQUIRED)
@@ -41,6 +42,7 @@ target_link_libraries(wafie PRIVATE
         ${CURL_LIBRARIES}
         ${LIBGEOIP_LIBRARIES}
         ${LIBYAJL_LIBRARIES}
+        ${LIBLUA_LIBRARIES}
 )
 
 add_executable(test_hello src/test.c)

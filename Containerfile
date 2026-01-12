@@ -28,19 +28,24 @@ RUN apt -y update \
     locales-all \
     dos2unix \
     rsync \
-    tar
+    tar \
+    lua5.4 \
+    liblua5.4-dev
+
 RUN apt clean \
     && git clone \
      --depth 1 \
      -b v3/master \
      --single-branch https://github.com/owasp-modsecurity/ModSecurity
+
 RUN cd /ModSecurity \
     && git submodule init \
     && git submodule update \
     && ./build.sh \
-    && ./configure \
+    && ./configure --with-lua \
     && make \
     && make install
+
 COPY config/ /config
 COPY new-conf/ /tmp/new-conf
 COPY include/ /wafie/include

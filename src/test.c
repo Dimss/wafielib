@@ -50,22 +50,19 @@ void *evalu_request(void *ptr) {
 }
 
 void *reload_ruleset(void *ptr) {
-    WafieRuleSetConfig cfg[3];
+    WafieRuleSetConfig cfg[1];
     cfg[0].protection_id = 1;
-    cfg[0].config_path = "/config1";
-    cfg[1].protection_id = 2;
-    cfg[1].config_path = "/config2";
-    cfg[2].protection_id = 3;
-    cfg[2].config_path = "/config3";
+    cfg[0].config_path = "/tmp/empty-config";
+
     wafie_load_rule_sets(cfg, 3);
     return NULL;
 }
 
 int main() {
     // WafieRuleSetConfig *cfg = malloc(sizeof(WafieRuleSetConfig) * 2);
-    WafieRuleSetConfig cfg[2];
+    WafieRuleSetConfig cfg[1];
     cfg[0].protection_id = 1;
-    cfg[0].config_path = "/config1";
+    cfg[0].config_path = "/tmp/empty-config";
     // cfg[1].protection_id = 2;
     // cfg[1].config_path = "/config2";
 
@@ -78,8 +75,8 @@ int main() {
     //
     //
     WafieEvaluationRequest request1 = {
-        .client_ip = "192.168.1.2",
-        .uri = "/",
+        .client_ip = "192.168.127.1",
+        .uri = "/wp-login.php",
         .http_method = "GET",
         .http_version = "1.1",
         .headers_count = 2,
@@ -96,7 +93,7 @@ int main() {
     // wafie_process_request_body(&request1);
     wafie_cleanup(&request1);
 
-
+    fprintf(stdout, "************** intervention url -> %s\n", request1.intervention_url);
 
     free(headers1);
 
