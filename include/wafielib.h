@@ -41,7 +41,7 @@ void wafie_init();
 
 void wafie_init_transaction(WafieEvaluationRequest *request);
 
-void wafie_cleanup(WafieEvaluationRequest const *request);
+void wafie_cleanup(WafieEvaluationRequest *request);
 
 void wafie_load_rule_sets(WafieRuleSetConfig cfg[], int cfg_size);
 

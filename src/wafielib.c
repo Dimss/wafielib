@@ -188,11 +188,35 @@ void wafie_init_transaction(WafieEvaluationRequest *request) {
         request->protection_id, elapsed_ms);
 }
 
-// cleanup transaction
-void wafie_cleanup(WafieEvaluationRequest const *request) {
-    if (request->transaction == NULL) return;
-    msc_process_logging(request->transaction);
-    msc_transaction_cleanup(request->transaction);
+void wafie_cleanup(WafieEvaluationRequest *request) {
+    if (!request) return;
+    if (request->transaction != NULL) {
+        msc_process_logging(request->transaction);
+        msc_transaction_cleanup(request->transaction);
+        request->transaction = NULL; // Prevent double-cleanup
+    }
+    free(request->client_ip);
+    free(request->uri);
+    free(request->http_method);
+    free(request->http_version);
+    free(request->protocol);
+    free(request->request_body);
+    free(request->response_body);
+    free(request->intervention_url);
+    if (request->request_headers) {
+        for (size_t i = 0; i < request->request_headers_count; i++) {
+            free((void*)request->request_headers[i].key);
+            free((void*)request->request_headers[i].value);
+        }
+        free(request->request_headers);
+    }
+    if (request->response_headers) {
+        for (size_t i = 0; i < request->response_headers_count; i++) {
+            free((void*)request->response_headers[i].key);
+            free((void*)request->response_headers[i].value);
+        }
+        free(request->response_headers);
+    }
 }
 
 // intervention flow

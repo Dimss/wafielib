@@ -68,34 +68,34 @@ int main() {
 
 
     WafieEvaluationRequestHeader *headers1 = malloc(sizeof(WafieEvaluationRequestHeader) * 3);
-    headers1[0].key = (const unsigned char *) "Host";
-    headers1[0].value = (const unsigned char *) "example.com";
-    headers1[1].key = (const unsigned char *) "User-Agent";
-    headers1[1].value = (const unsigned char *) "KubeGuard/1.0";
-    headers1[2].key = (const unsigned char *) "Content-Type";
-    headers1[2].value = (const unsigned char *) "application/x-www-form-urlencoded";
+    headers1[0].key = (const unsigned char *) strdup("Host");
+    headers1[0].value = (const unsigned char *) strdup("example.com");
+    headers1[1].key = (const unsigned char *) strdup("User-Agent");
+    headers1[1].value = (const unsigned char *) strdup("KubeGuard/1.0");
+    headers1[2].key = (const unsigned char *) strdup("Content-Type");
+    headers1[2].value = (const unsigned char *) strdup("application/x-www-form-urlencoded");
 
     WafieEvaluationRequestHeader *headers2 = malloc(sizeof(WafieEvaluationRequestHeader) * 3);
-    headers2[0].key = (const unsigned char *) "Host";
-    headers2[0].value = (const unsigned char *) "example.com";
-    headers2[1].key = (const unsigned char *) "User-Agent";
-    headers2[1].value = (const unsigned char *) "KubeGuard/1.0";
-    headers2[2].key = (const unsigned char *) "Content-Type";
-    headers2[2].value = (const unsigned char *) "application/x-www-form-urlencoded";
+    headers2[0].key = (const unsigned char *) strdup("Host");
+    headers2[0].value = (const unsigned char *) strdup("example.com");
+    headers2[1].key = (const unsigned char *) strdup("User-Agent");
+    headers2[1].value = (const unsigned char *) strdup("KubeGuard/1.0");
+    headers2[2].key = (const unsigned char *) strdup("Content-Type");
+    headers2[2].value = (const unsigned char *) strdup("application/x-www-form-urlencoded");
     // headers1[3].key = (const unsigned char *) "Content-Length";
     // headers1[3].value = (const unsigned char *) "7"; // strlen("foo=bar")
 
     WafieEvaluationRequest request1 = {
-        .client_ip = "192.168.127.1",
-        .uri = "/v2/g-recaptcha-response",
-        .http_method = "POST",
-        .http_version = "1.1",
+        .client_ip = strdup("192.168.127.1"),
+        .uri = strdup("/v2/g-recaptcha-response"),
+        .http_method = strdup("POST"),
+        .http_version = strdup("1.1"),
         .request_headers_count = 3,
         .request_headers = headers1,
         .response_headers_count = 3,
         .response_headers = headers2,
         .response_code = 200,
-        .protocol = "HTTP/1.1",
+        .protocol = strdup("HTTP/1.1"),
         // .body = "foo=bar",
         .protection_id = 1,
     };
@@ -108,7 +108,7 @@ int main() {
     wafie_init_transaction(&request1);
     //request
     wafie_process_request_headers(&request1);
-    request1.request_body = "foo=bar";
+    request1.request_body = strdup("foo=bar");
     wafie_process_request_body(&request1);
     // response
     wafie_process_response_headers(&request1);
@@ -118,13 +118,10 @@ int main() {
     wafie_cleanup(&request1);
 
 
-    free(headers1);
-
-
-    char *audit_content = read_file("/tmp/modsec_audit.log");
-    if (audit_content) {
-        printf("Config loaded: %zu bytes\n", strlen(audit_content));
-        fprintf(stdout, "%s\n", audit_content);
-        free(audit_content);
-    }
+    // char *audit_content = read_file("/tmp/modsec_audit.log");
+    // if (audit_content) {
+    //     printf("Config loaded: %zu bytes\n", strlen(audit_content));
+    //     fprintf(stdout, "%s\n", audit_content);
+    //     free(audit_content);
+    // }
 }
