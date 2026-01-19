@@ -202,7 +202,7 @@ int wafie_process_intervention(WafieEvaluationRequest *request) {
         fprintf(stdout, "[libwafie.wafie_process_intervention.protection.id: %d] intervention triggered \n",
                 request->protection_id);
         if (intervention.log != NULL) {
-            fprintf(stdout, "%s\n", intervention.log);
+            fprintf(stdout, "[intervention.log] %s\n", intervention.log);
             free(intervention.log);
             intervention.log = NULL;
         }
@@ -225,7 +225,7 @@ int wafie_process_intervention(WafieEvaluationRequest *request) {
     return 0;
 }
 
-// process headers
+// process request headers
 int wafie_process_request_headers(WafieEvaluationRequest *request) {
     if (request->transaction == NULL) {
         fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] transaction is NULL, skipping \n",
@@ -261,12 +261,13 @@ int wafie_process_request_headers(WafieEvaluationRequest *request) {
     if (intervention_status != 0) {
         goto finish_processing;
     }
-    for (size_t i = 0; i < request->headers_count; i++) {
-        msc_add_request_header(request->transaction, request->headers[i].key, request->headers[i].value);
+    for (size_t i = 0; i < request->request_headers_count; i++) {
+        msc_add_request_header(request->transaction, request->request_headers[i].key,
+                               request->request_headers[i].value);
         fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] header -> %s: %s\n",
                 request->protection_id,
-                (const char *) request->headers[i].key,
-                (const char *) request->headers[i].value);
+                (const char *) request->request_headers[i].key,
+                (const char *) request->request_headers[i].value);
     }
     fprintf(stdout, "[libwafie.wafie_process_request_headers.protection.id: %d] processing headers\n",
             request->protection_id);
@@ -294,7 +295,7 @@ finish_processing:
     return intervention_status;
 }
 
-// process body
+// process request body
 int wafie_process_request_body(WafieEvaluationRequest *request) {
     if (request->transaction == NULL) {
         fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] transaction is NULL, skipping \n",
@@ -304,28 +305,144 @@ int wafie_process_request_body(WafieEvaluationRequest *request) {
     struct timespec start, end;
     int intervention_status = 0;
     // process request body
-    if (request->body != NULL) {
+    if (request->request_body != NULL) {
         fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] processing request\n",
                 request->protection_id);
         clock_gettime(CLOCK_MONOTONIC, &start);
         // append request body
-        msc_append_request_body(request->transaction,
-                                (const unsigned char *) request->body,
-                                strlen(request->body));
+        int const res = msc_append_request_body(request->transaction,
+                                                (const unsigned char *) request->request_body,
+                                                strlen(request->request_body));
+        if (res == 0) {
+            fprintf(
+                stdout,
+                "[libwafie.wafie_process_request_body.protection.id: %d] append request body failed return: %d\n",
+                request->protection_id, res);
+        }
         // process request body
         msc_process_request_body(request->transaction);
         // check for intervention
         intervention_status = wafie_process_intervention(request);
         clock_gettime(CLOCK_MONOTONIC, &end);
 
-        long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
-        double elapsed_ms = elapsed_ns / 1000000.0;
+        long long const elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
+        double const elapsed_ms = elapsed_ns / 1000000.0;
         fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] processing request took  %.3f ms\n",
                 request->protection_id, elapsed_ms);
 
         if (intervention_status != 0) {
             return intervention_status;
         }
+    } else {
+        fprintf(stdout, "[libwafie.wafie_process_request_body.protection.id: %d] request body NULL, skipping \n",
+                request->protection_id);
+    }
+    return intervention_status;
+}
+
+// process response headers
+int wafie_process_response_headers(WafieEvaluationRequest *request) {
+    if (request->transaction == NULL) {
+        fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] transaction is NULL, skipping \n",
+                request->protection_id);
+        return 0;
+    }
+    if (request->response_headers_count == 0) {
+        fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] no response headers, skipping \n",
+                request->protection_id);
+        return 0;
+    }
+    if (request->response_code == 0) {
+        fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] no response code, skipping \n",
+                request->protection_id);
+        return 0;
+    }
+    if (request->protocol == NULL) {
+        fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] no response protocol, skipping \n",
+                request->protection_id);
+        return 0;
+    }
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] processing request \n",
+            request->protection_id);
+    int intervention_status = 0;
+    // add response headers to transaction
+    for (size_t i = 0; i < request->response_headers_count; i++) {
+        msc_add_response_header(request->transaction, request->response_headers[i].key,
+                                request->response_headers[i].value);
+        fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] header -> %s: %s\n",
+                request->protection_id,
+                (const char *) request->response_headers[i].key,
+                (const char *) request->response_headers[i].value);
+    }
+    fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] processing headers\n",
+            request->protection_id);
+    // process response headers phase
+    msc_process_response_headers(request->transaction, request->response_code, request->protocol);
+    intervention_status = wafie_process_intervention(request);
+    if (intervention_status != 0) {
+        goto finish_processing;
+    }
+    // process response body phase
+    fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] processing body\n",
+            request->protection_id);
+    msc_process_response_body(request->transaction);
+    intervention_status = wafie_process_intervention(request);
+    // unconditionally finish processing once intervention detected
+finish_processing:
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long long elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
+    double elapsed_ms = elapsed_ns / 1000000.0;
+    fprintf(
+        stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] processing request took  %.3f ms\n",
+        request->protection_id, elapsed_ms);
+    fprintf(stdout, "[libwafie.wafie_process_response_headers.protection.id: %d] intervention status: %d\n",
+            request->protection_id, intervention_status);
+    return intervention_status;
+}
+
+// process request body
+int wafie_process_response_body(WafieEvaluationRequest *request) {
+    if (request->transaction == NULL) {
+        fprintf(stdout, "[libwafie.wafie_process_response_body.protection.id: %d] transaction is NULL, skipping \n",
+                request->protection_id);
+        return 0;
+    }
+    struct timespec start, end;
+    int intervention_status = 0;
+    // process request body
+    if (request->response_body != NULL) {
+        fprintf(stdout, "[libwafie.wafie_process_response_body.protection.id: %d] processing request\n",
+                request->protection_id);
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        // append request body
+        int const res = msc_append_response_body(request->transaction,
+                                                (const unsigned char *) request->response_body,
+                                                strlen(request->response_body));
+        if (res == 0) {
+            fprintf(
+                stdout,
+                "[libwafie.wafie_process_response_body.protection.id: %d] append response body failed return: %d\n",
+                request->protection_id, res);
+        }
+        // process request body
+        msc_process_response_body(request->transaction);
+        // check for intervention
+        intervention_status = wafie_process_intervention(request);
+        clock_gettime(CLOCK_MONOTONIC, &end);
+
+        long long const elapsed_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
+        double const elapsed_ms = elapsed_ns / 1000000.0;
+        fprintf(stdout, "[libwafie.wafie_process_response_body.protection.id: %d] processing request took  %.3f ms\n",
+                request->protection_id, elapsed_ms);
+
+        if (intervention_status != 0) {
+            return intervention_status;
+        }
+    } else {
+        fprintf(stdout, "[libwafie.wafie_process_response_body.protection.id: %d] response body NULL, skipping \n",
+                request->protection_id);
     }
     return intervention_status;
 }
